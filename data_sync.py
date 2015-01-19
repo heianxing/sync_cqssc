@@ -15,7 +15,7 @@ from mylogger import get_logger
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-db = torndb.Connection(host="localhost", database="HAOMA", user="root", password="c_p")
+db = torndb.Connection(host="localhost", database="CAIPIAO", user="user", password="passwd")
 cplog = get_logger("caipiao")
 
 class Data_Sync(object):

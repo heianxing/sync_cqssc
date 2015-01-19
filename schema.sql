@@ -1,5 +1,5 @@
-create database if not exists HAOMA;
-use HAOMA;
+create database if not exists CAIPIAO;
+use CAIPIAO;
 
 drop table if exists haoma;
 create table haoma
