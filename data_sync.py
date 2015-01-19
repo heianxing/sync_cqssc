@@ -24,10 +24,10 @@ db = torndb.Connection(host=DBHOST, database=SCHEMA, user=DBUSER, password=DBPAS
 cplog = get_logger("caipiao")
 
 class Data_Sync(object):
-    ssc_re = re.compile(r'<td class=\'gray\'>(.*?)</td><td class=\'red big\'>(.*?)</td>.*?<tr>')
+    ssc_re = re.compile(r'<td class=\'gray\'>(.*?)</td>(<td class=\'red big\'>|<td style=\'width:65px\'>)(.*?)</td>.*?<tr>')
 
     def __init__(self, start_date="20150101", sleep_secs = 10, run_ever=True):
-        self.start_date = start_date
+        self.start_date = start_date if start_date > "20130101" else "20150101"
         self.run_ever = run_ever
         self.base_url = "http://chart.cp.360.cn/kaijiang/kaijiang?lotId=255401&spanType=2&span="
         self.latest_date = ''
@@ -62,16 +62,22 @@ class Data_Sync(object):
                 1、检查是否同一天，如果不是，就下载数据，执行步骤2，增加天数，直到数据库日期与当前日一致；
                 2、检查数据库中的期数与下载回来的数据的最新期是否一致，一致,检查日期是否一致，是就跳过，否则插入数据；
             """
+            dl_times = 0
             while (cur_date - latest_date).days > 0:
                 if int(self.latest_period) < 120:
                     dl_date = latest_date.strftime("%Y-%m-%d")
                     dl_url = self.base_url + dl_date + "_" + dl_date
                     data = self.download_with_requests(dl_url)
                     if not data:
-                        """ 直到下载成功为止 """
-                        time.sleep(5)
-                        continue
+                        if dl_times < 3:
+                            dl_times += 1
+                            time.sleep(2)
+                            continue
+                        else:
+                            latest_date += timedelta(1)
+                            continue
 
+                    dl_times = 0
                     self.latest_date = latest_date.strftime('%Y%m%d')
                     lottery_numbers = data[int(self.latest_period):]
                     self.insert_into_mysql(self.latest_date, lottery_numbers)
@@ -94,7 +100,9 @@ class Data_Sync(object):
         for data in datas:
             period = data[0]
             date_period = item_date + period
-            lottery_number = data[1]
+            lottery_number = data[2]
+            if not re.search('\d+', lottery_number):
+                continue
             a, b, c, d, e = list(lottery_number)
             insert_data = (item_date, period, date_period, lottery_number, a, b, c, d, e)
             insert_datas.append(insert_data)
@@ -106,6 +114,7 @@ class Data_Sync(object):
                 db.executemany(sql, insert_datas)
             except Exception as e:
                 print e
+                sys.exit(1)
         else:
             cplog.info("no more new data to sync, wait for {0} seconds".format(self.sleep_secs))
             self.need_sleep = True
@@ -132,7 +141,7 @@ class Data_Sync(object):
             return data
 
 def run():
-    sync = Data_Sync(sleep_secs=30)
+    sync = Data_Sync(start_date="20140101", sleep_secs=30)
     sync.run()
 
 if __name__ == "__main__":
