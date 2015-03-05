@@ -26,7 +26,7 @@ cplog = get_logger("caipiao")
 class Data_Sync(object):
     ssc_re = re.compile(r'<td class=\'gray\'>(.*?)</td>(<td class=\'red big\'>|<td style=\'width:65px\'>)(.*?)</td>.*?<tr>')
 
-    def __init__(self, start_date="20150101", sleep_secs = 10, run_ever=True):
+    def __init__(self, start_date="20150101", sleep_secs = 10, run_ever=True, callback=None):
         self.start_date = start_date if start_date > "20130101" else "20150101"
         self.run_ever = run_ever
         self.base_url = "http://chart.cp.360.cn/kaijiang/kaijiang?lotId=255401&spanType=2&span="
@@ -34,6 +34,7 @@ class Data_Sync(object):
         self.latest_period = ''
         self.need_sleep = False
         self.sleep_secs = sleep_secs
+        self.callback=callback
 
     def run(self):
         while True:
@@ -42,6 +43,7 @@ class Data_Sync(object):
                 self.need_sleep = False
             else:
                 self.sync_data_from_360()
+                self.callback()
 
     def sync_data_from_360(self):
         """ 根据数据库中最新一条数据，从 cp.360.com 同步数据至最新数据 """
@@ -104,12 +106,23 @@ class Data_Sync(object):
             if not re.search('\d+', lottery_number):
                 continue
             a, b, c, d, e = list(lottery_number)
-            insert_data = (item_date, period, date_period, lottery_number, a, b, c, d, e)
+            ab = a + b
+            ac = a + c
+            ad = a + d
+            ae = a + e
+            bc = b + c
+            bd = b + d
+            be = b + e
+            cd = c + d
+            ce = c + e
+            de = d + e
+            insert_data = (item_date, period, date_period, lottery_number, a, b, c, d, e, ab, ac, ad, ae, bc, bd, be, cd, ce, de)
             insert_datas.append(insert_data)
 
         if insert_datas:
             cplog.info("current insert into haoma:{0}, {1}".format(item_date, datas))
-            sql = "insert into haoma(item_date, period, date_period, lottery_number, a, b, c, d, e) values(%s, %s, %s, %s, %s,  %s, %s, %s, %s)"
+            """ abcde means  lottery_number """
+            sql = "insert into haoma(item_date, period, date_period, abcde, a, b, c, d, e, ab, ac, ad, ae, bc, bd, be, cd, ce, de) values(%s, %s, %s, %s, %s,  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
             try:
                 db.executemany(sql, insert_datas)
             except Exception as e:
@@ -141,7 +154,8 @@ class Data_Sync(object):
             return data
 
 def run():
-    sync = Data_Sync(start_date="20140101", sleep_secs=30)
+    from general_run import entry_for_all
+    sync = Data_Sync(start_date="20150101", sleep_secs=30, callback=entry_for_all)
     sync.run()
 
 if __name__ == "__main__":
